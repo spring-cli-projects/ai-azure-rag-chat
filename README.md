@@ -55,11 +55,13 @@ This sample uses the Azure AI Search VectorStore.
 Information on how to set that up is in the `README.md` of the repository https://github.com/spring-cli-projects/ai-azure-rag-load
 
 
-## Building and running
+## Running the application
 
 ```
 ./mvnw spring-boot:run
 ```
+
+Will load the data and exit the application
 
 ## Chat with the document
 
@@ -139,5 +141,39 @@ and ask the same question, the response is
 
 Since the second version of the PDF document has updated the date to be 2017.
 
+
+## Evaluation Driven Development
+
+There is a small JUnit test that uses the `RelevancyEvaluator` to show how you can test your AI application.
+The code is as following
+
+
+```java
+
+@SpringBootTest
+public class ChatbotTests {
+
+
+    @Autowired
+    private ChatBot chatBot;
+
+    @Autowired
+    private ChatClient chatClient;
+
+    @Test
+    void testEvaluation() {
+
+        var prompt = new Prompt(new UserMessage("What is the purpose of Carina?"));
+        ChatBotResponse chatBotResponse = chatBot.call(new PromptContext(prompt));
+
+        var relevancyEvaluator = new RelevancyEvaluator(this.chatClient);
+
+        EvaluationRequest evaluationRequest = new EvaluationRequest(chatBotResponse);
+        EvaluationResponse evaluationResponse = relevancyEvaluator.evaluate(evaluationRequest);
+        assertTrue(evaluationResponse.isPass(), "Response is not relevant to the question");
+    }
+}
+
+```
 
 
