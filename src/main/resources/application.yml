@@ -1,0 +1,15 @@
+debug: false
+spring:
+  ai:
+    azure:
+      openai:
+        api-key: 
+        endpoint: https://springai.openai.azure.com/
+        chat:
+          options:
+            deployment-name: gpt-35-turbo-16k
+    vectorstore:
+      azure:
+        api-key: 
+        url: https://spring-ai-search.search.windows.net
+        index-name: spring_ai_carina_index
