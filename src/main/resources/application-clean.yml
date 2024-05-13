@@ -3,7 +3,7 @@ spring:
   ai:
     azure:
       openai:
-        api-key:
+        api-key: 
         endpoint: https://springai.openai.azure.com/
         chat:
           options:

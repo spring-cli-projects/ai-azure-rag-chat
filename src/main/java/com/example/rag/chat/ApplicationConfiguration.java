@@ -1,6 +1,8 @@
 package com.example.rag.chat;
 
 import com.azure.search.documents.indexes.SearchIndexClient;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.ChatClient;
 import org.springframework.ai.chat.chatbot.ChatBot;
 import org.springframework.ai.chat.chatbot.DefaultChatBot;
@@ -17,10 +19,15 @@ import java.util.List;
 
 @Configuration
 public class ApplicationConfiguration {
+
+	private static final Logger logger = LoggerFactory.getLogger(ApplicationConfiguration.class);
+
 	@Bean
 	public ChatBot chatBot(ChatClient chatClient, VectorStore vectorStore) {
 		SearchRequest searchRequest = SearchRequest.defaults()
-				.withFilterExpression("version == 1");
+				.withFilterExpression("version == 2");
+
+		logger.info("**** Using Version 2 of the PDF ****");
 
 		return DefaultChatBot.builder(chatClient)
 				.withRetrievers(List.of(new VectorStoreRetriever(vectorStore, searchRequest)))
