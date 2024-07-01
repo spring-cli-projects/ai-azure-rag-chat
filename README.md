@@ -3,22 +3,18 @@
 ## Introduction
 
 Retrieval Augmented Generation (RAG) is a technique that integrates your data into the AI model's responses.
+This project demonstrates Retrieval Augmented Generation in practice and can serve as the foundation for customizing to meet your specific requirements in your own project.
 
-First, you need to upload the documents you wish to have analyzed in an AI respoinse into a Vector Database.
+## How it works
+
+First, you need to upload the documents you wish to have analyzed in an AI response into a Vector Database.
 This involves breaking down the documents into smaller segments because AI models typically only manage to process a few tens of kilobytes of custom data for generating responses.
 After splitting, these document segments are stored in the Vector Database.
 
 This first step was done using the code in the repository https://github.com/spring-cli-projects/ai-azure-rag-load
 
 The second step involves including data from the Vector Database that is pertinent to your query when you make a request to the AI model.
-This is achieved by performing a similarity search within the Vector Database to identify relevant content.
-
-In the third step, you merge the text of your request with the documents retrieved from the Vector Database before sending it to the AI model.
-This process is informally referred to as 'stuffing the prompt'.
-
-The second and third steps are done is using the code in this repository via the help of the Spring AI `ChatBot` class.
-
-This project demonstrates Retrieval Augmented Generation in practice and can serve as the foundation for customizing to meet your specific requirements in your own project.
+This is achieved by performing a similarity search within the Vector Database to identify relevant content and merging it with your original user request text.  This steps is done using Spring AI's `QuestionAnswerAdvisor` in the `ChatClient` fluent api.
 
 ## Endpoints
 
@@ -35,24 +31,33 @@ The `/rag/chatbot` endpoint takes a `question` parameter which is the question y
 You should have already run the application in the repository https://github.com/spring-cli-projects/ai-azure-rag-load
 
 
-### Azure OpenAI Credentials
+### Azure OpenAI setup
 
-Obtain your Azure OpenAI `endpoint` and `api-key` from the Azure OpenAI Service section on [Azure Portal](https://portal.azure.com)
+1. Obtain your Azure OpenAI `endpoint` and `api-key` from the Azure OpenAI Service section on [Azure Portal](https://portal.azure.com) and deploy a chat model, such as `gpt-35-turbo-16k` and an embedding model such as `text-embedding-ada-002`.
 
-The Spring AI project defines a configuration property named `spring.ai.azure.openai.api-key` that you should set to the value of the `API Key` obtained from Azure
+2. Create an instance of [Azure AI Search vector database](https://azure.microsoft.com/en-us/products/ai-services/ai-search/) and obtain the API keys and URL.
 
-Exporting an environment variables is one way to set these configuration properties.
-```shell
-export SPRING_AI_AZURE_OPENAI_API_KEY=<INSERT KEY HERE>
-export SPRING_AI_AZURE_OPENAI_ENDPOINT=<INSERT ENDPOINT URL HERE>
-export SPRING_AI_AZURE_OPENAI_CHAT_OPTIONS_DEPLOYMENT_NAME=<INSERT NAME HERE>
+Here is the `application.yml` file for the application. You will need to fill in the appropriate API keys, model names, and endpoints.
+Only the API keys have been removed in the configuration.
+```yaml
+spring:
+  ai:
+    azure:
+      openai:
+        api-key:
+        endpoint: https://springai.openai.azure.com/
+        chat:
+          options:
+            deployment-name: gpt-4o
+        embedding:
+          options:
+            deployment-name: text-embedding-ada-002
+    vectorstore:
+      azure:
+        api-key:
+        url: https://springaisearch.search.windows.net
+        index-name: carina_index
 ```
-Note, the `/resources/application.yml` references the environment variable `${SPRING_AI_AZURE_OPENAI_API_KEY}`.
-
-## Azure AI Search VectorStore
-
-This sample uses the Azure AI Search VectorStore. 
-Information on how to set that up is in the `README.md` of the repository https://github.com/spring-cli-projects/ai-azure-rag-load
 
 
 ## Running the application
@@ -84,112 +89,61 @@ The response is
 
 ## Change the version of the document being used
 
-The application is setup to answer questions about version 1 of the PDF.  If we ask the chatbot, "When was Carina founded?"
+The application is defaults to answer questions using version 2 of the PDF.  If we ask the chatbot, "When was Carina founded?"
 
 ```shell
-http --body --unsorted localhost:8080/rag/chatbot question=="When was Carina founded?"
-
+http --body localhost:8080/rag/chatbot question=="When was Carina founded?"
 ```
 
-The response is 
+The response is `Carina was founded in 2017.`
 
-```json
-{
-    "question": "When was Carina founded?",
-    "answer": "Carina was founded in 2016."
-}
+Using version 1 of the PDF by passing in the `version` request parameter gives
+
+```shell
+http --body localhost:8080/rag/chatbot question=="When was Carina founded?" version==1
 ```
 
-However, if we change the definition of the `SearchRequest` used with the `ChatBot` from
-
-```java
-	@Bean
-	public ChatBot chatBot(ChatClient chatClient, VectorStore vectorStore) {
-		SearchRequest searchRequest = SearchRequest.defaults()
-				.withFilterExpression("version == 1");
-
-		return DefaultChatBot.builder(chatClient)
-				.withRetrievers(List.of(new VectorStoreRetriever(vectorStore, searchRequest)))
-				.withAugmentors(List.of(new QuestionContextAugmentor()))
-				.build();
-	}
-```
-
-to 
-
-```java
-	@Bean
-	public ChatBot chatBot(ChatClient chatClient, VectorStore vectorStore) {
-		SearchRequest searchRequest = SearchRequest.defaults()
-				.withFilterExpression("version == 2");
-
-		return DefaultChatBot.builder(chatClient)
-				.withRetrievers(List.of(new VectorStoreRetriever(vectorStore, searchRequest)))
-				.withAugmentors(List.of(new QuestionContextAugmentor()))
-				.build();
-	}
-```
-
-and ask the same question, the response is 
-
-```json
-{
-    "question": "When was Carina founded?",
-    "answer": "Carina was founded in 2017."
-}
-```
-
-Since the second version of the PDF document has updated the date to be 2017.
+The response is `Carina was founded in 2016.`
 
 
 ## Evaluation Driven Development
 
-There is a small JUnit test that uses the `RelevancyEvaluator` to show how you can test your AI application.
+There is a small JUnit test that uses the `RelevancyEvaluator` to show how you can test your AI application. 
 The code is as following
 
-
 ```java
-
 @SpringBootTest
 public class ChatbotTests {
-
+    
+    @Autowired
+    private ChatClient.Builder builder;
 
     @Autowired
-    private ChatBot chatBot;
-
-    @Autowired
-    private ChatClient chatClient;
+    private VectorStore vectorStore;
 
     @Test
     void testEvaluation() {
 
-        var prompt = new Prompt(new UserMessage("What is the purpose of Carina?"));
-        ChatBotResponse chatBotResponse = chatBot.call(new PromptContext(prompt));
+        var question = "What is the purpose of Carina?";
 
-        var relevancyEvaluator = new RelevancyEvaluator(this.chatClient);
+        ChatClient chatClient = builder.build();
 
-        EvaluationRequest evaluationRequest = new EvaluationRequest(chatBotResponse);
+        ChatResponse chatResponse = chatClient
+                .prompt()
+                .advisors(new QuestionAnswerAdvisor(vectorStore, SearchRequest.query("version == 2")))
+                .user("What is the purpose of Carina?")
+                .call()
+                .chatResponse();
+
+        var relevancyEvaluator = new RelevancyEvaluator(this.builder);
+
+        EvaluationRequest evaluationRequest = new EvaluationRequest(question, List.of(), chatResponse);
         EvaluationResponse evaluationResponse = relevancyEvaluator.evaluate(evaluationRequest);
         assertTrue(evaluationResponse.isPass(), "Response is not relevant to the question");
+
     }
 }
-
-```
-# Deploying to azure
-
-```shell
-az spring app deploy --resource-group Mark-Pollack --service si-mark-spring-ai-rag --name spring-ai-rag --artifact-path /home/mark/spring-cli-projects/ai-azure-rag-chat/target/spring-ai-rag-chat-0.0.1-SNAPSHOT.jar --runtime-version Java_17
 ```
 
-usage
-
-```shell
-http --body --unsorted https://si-mark-spring-ai-rag-spring-ai-rag.azuremicroservices.io/rag/chatbot question=="What is the purpose of Carina?"
-```
-
-and
-
-```shell
-http --body --unsorted https://si-mark-spring-ai-rag-spring-ai-rag.azuremicroservices.io/rag/chatbot question=="When was Carina founded?"
-```
+The `RelevancyEvalutor` will determine, using the AI Model itself, if the answer for the question is relevant.
 

@@ -13,6 +13,6 @@ spring:
             deployment-name: text-embedding-ada-002
     vectorstore:
       azure:
-        api-key:
+        api-key: 
         url: https://springaisearch.search.windows.net
         index-name: carina_index
