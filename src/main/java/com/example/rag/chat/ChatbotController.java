@@ -1,9 +1,11 @@
 package com.example.rag.chat;
 
-import org.springframework.ai.chat.chatbot.ChatBot;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.QuestionAnswerAdvisor;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.ai.chat.prompt.transformer.PromptContext;
+import org.springframework.ai.vectorstore.SearchRequest;
+import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -15,23 +17,30 @@ import java.util.Map;
 @RestController
 @RequestMapping("/rag/chatbot")
 public class ChatbotController {
-	private ChatBot chatBot;
 
-	public ChatbotController(ChatBot chatBot) {
-		this.chatBot = chatBot;
+	private final ChatClient chatClient;
+
+	private final VectorStore vectorStore;
+
+	public ChatbotController(VectorStore vectorStore, ChatClient.Builder builder) {
+		this.vectorStore = vectorStore;
+		this.chatClient = builder.build();
 	}
+
 	@GetMapping
-	public Map query(
-			@RequestParam(value = "question", defaultValue = "What is the purpose of Carina?") String question) {
+	public String query(
+			@RequestParam(value = "question", defaultValue = "What is the purpose of Carina?") String question,
+			@RequestParam(value = "version", defaultValue = "2") String version) {
 
-		var prompt = new Prompt(new UserMessage(question));
-
-		var chatBotResponse  = this.chatBot.call(new PromptContext(prompt));
-
-		Map<String, Object> response = new HashMap<>();
-		response.put("question", question);
-		response.put("answer", chatBotResponse.getChatResponse().getResult().getOutput().getContent());
-		return response;
+		var filterExpression = "version == " + version; // portable across all vector stores
+		System.out.println(filterExpression);
+		return this.chatClient
+				.prompt()
+				.advisors(new QuestionAnswerAdvisor(vectorStore, SearchRequest.defaults().withFilterExpression(filterExpression)))
+				.user(question)
+				.call()
+				.content();
 	}
+
 
 }

@@ -175,5 +175,21 @@ public class ChatbotTests {
 }
 
 ```
+# Deploying to azure
 
+```shell
+az spring app deploy --resource-group Mark-Pollack --service si-mark-spring-ai-rag --name spring-ai-rag --artifact-path /home/mark/spring-cli-projects/ai-azure-rag-chat/target/spring-ai-rag-chat-0.0.1-SNAPSHOT.jar --runtime-version Java_17
+```
+
+usage
+
+```shell
+http --body --unsorted https://si-mark-spring-ai-rag-spring-ai-rag.azuremicroservices.io/rag/chatbot question=="What is the purpose of Carina?"
+```
+
+and
+
+```shell
+http --body --unsorted https://si-mark-spring-ai-rag-spring-ai-rag.azuremicroservices.io/rag/chatbot question=="When was Carina founded?"
+```
 

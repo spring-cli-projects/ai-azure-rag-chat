@@ -7,9 +7,12 @@ spring:
         endpoint: https://springai.openai.azure.com/
         chat:
           options:
-            deployment-name: gpt-35-turbo-16k
+            deployment-name: gpt-4o
+        embedding:
+          options:
+            deployment-name: text-embedding-ada-002
     vectorstore:
       azure:
-        api-key: 
-        url: https://spring-ai-search.search.windows.net
+        api-key:
+        url: https://springaisearch.search.windows.net
         index-name: carina_index
